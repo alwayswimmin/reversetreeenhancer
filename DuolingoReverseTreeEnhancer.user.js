@@ -1,12 +1,13 @@
 // ==UserScript==
-// @name         Duoling Reverse Tree Enhancer
-// @namespace    https://github.com/guillaumebrunerie/reversetreeenhancer
-// @version      0.2.3
+// @name         Duolingo Reverse Tree Enhancer
+// @namespace    https://github.com/alwayswimmin/reversetreeenhancer
+// @version      0.3.0
 // @description  Enhance reverse trees by adding a TTS (currently Google Translate) and turning most exercices into listening exercices by hiding the text in the target language.
-// @author       Guillaume Brunerie
+// @author       Guillaume Brunerie, Samuel Hsiang
 // @match        https://www.duolingo.com/*
-// @downloadURL  https://github.com/guillaumebrunerie/reversetreeenhancer/raw/master/DuolingoReverseTreeEnhancer.user.js
+// @downloadURL  https://github.com/alwayswimmin/reversetreeenhancer/raw/master/DuolingoReverseTreeEnhancer.user.js
 // @grant        none
+// @require      http://code.jquery.com/jquery-latest.js
 // ==/UserScript==
 
 console.debug('Duolingo: Reverse Tree Enhancer');
@@ -79,7 +80,7 @@ function hideSoundErrorBox() {
 }
 
 function displaySoundErrorBox(url) {
-    var container = document.getElementsByClassName("player-container")[0];
+    var container = document.querySelector("[data-test='challenge-header']").parentNode;
     container.insertBefore(soundErrorBox, container.firstChild);
     document.getElementById("sound-error-link").href = url;
     soundErrorBox.style.display = "";
@@ -94,11 +95,14 @@ var waiting = false;
 var counter = 0;
 
 function playSound(url) {
+	var a = new Audio(url);
+    a.play();
+	/*
     counter = counter + 1;
     if(prevAudio){ prevAudio.destruct(); }
     prevAudio = audio;
     waiting = (prevAudio && prevAudio.playState == 1);
-    // race condition here…
+    // race condition here...
     audio = soundManager.createSound({
         id: "sound-" + counter,
         url: url,
@@ -117,6 +121,7 @@ function playSound(url) {
             }
         }
     });
+    */
 }
 
 var sentenceGlobal = null;
@@ -162,12 +167,9 @@ function keyUpHandler(e) {
 
 document.addEventListener('keyup', keyUpHandler, false);
 
-/* jQuery hack to avoid reading things in display:none, copy-pasted from StackOverflow */
 function sayCell(cell) {
     var t = $(cell).clone();
-    $('body').append(t);
-    t.find('*:not(:visible)').remove();
-    t.remove();
+    t.find('table').remove();
     say(t.text());
 }
 
@@ -177,19 +179,34 @@ function sayCell(cell) {
 
 /* Translation from target language (eg. Polish) */
 function challengeTranslateTarget(){
-    var cell = challenge.getElementsByClassName("text-to-translate")[0];
+    // var cell = challenge.getElementsByClassName("text-to-translate")[0];
+    var cell = document.querySelector("[data-test='challenge-translate-prompt']");
+    sayCell(cell);
+    cell.className = "text-to-translate ttt-hide";
+	cell.onclick = function(){cell.className = "text-to-translate ttt-not-hide"}
+	/*
     if(grade.children.length === 0){
         sayCell(cell);
         cell.className = "text-to-translate ttt-hide";
         cell.onclick = function(){cell.className = "text-to-translate ttt-not-hide"}
     } else {
-        cell.className = "text-to-translate";
-        cell.onclick = null
+       cell.className = "text-to-translate";
+       cell.onclick = null;
     }
+    */
 }
 
 /* Translation from source language (eg. English) */
 function challengeTranslateSource(){
+	if(document.getElementsByTagName("h2").length > 0) {
+		var betterAnswer = document.getElementsByTagName("h2")[0].getElementsByTagName("span");
+		if(betterAnswer.length === 0){
+    	    say(document.getElementById("submitted-text").textContent);
+		} else {
+        	say(betterAnswer[0].textContent);
+    	}
+    }
+	/*
     if(grade.children.length > 0){
         var betterAnswer = grade.getElementsByTagName("h1")[0].getElementsByTagName("span");
         // Hack for making timed practice work
@@ -206,13 +223,14 @@ function challengeTranslateSource(){
             say(betterAnswer[0].textContent);
         }
     }
+    */
 }
 
-/* Multiple-choice translation question */
+/* Multiple-choice translation question */ /* TODO */
 function challengeJudge(){
     var textCell = challenge.getElementsByClassName("col-left")[0].getElementsByTagName("bdi")[0];
     var ul = challenge.getElementsByTagName("ul")[0];
-    if(grade.children.length === 0){
+    if(document.getElementsByTagName("h2").length === 0) {
         textCell.style.color = hColor;
         textCell.style.backgroundColor = hColor;
         textCell.style.display = "block";
@@ -232,7 +250,7 @@ function challengeSelect(){
     var hone = challenge.getElementsByTagName("h1")[0];
     var ul = challenge.getElementsByTagName("ul")[0];
     var span;
-    if(grade.children.length === 0){
+    if(document.getElementsByTagName("h2").length === 0) {
         var sp = hone.textContent.split(quotMark);
         hone.innerHTML = sp[0] + sp[1] + "<span>" + sp[2] + "</span>" + sp[3] + sp[4];
         span = hone.getElementsByTagName("span")[0];
@@ -249,10 +267,10 @@ function challengeSelect(){
 
 /* Type the word corresponding to the images */
 function challengeName(){
-    var lis = challenge.getElementsByClassName("list-tilted-images")[0].getElementsByTagName("li");
+    var lis = challenge.getElementsByTagName("li");
     var hone = challenge.getElementsByTagName("h1")[0];
     var span, i;
-    if(grade.children.length === 0){
+    if(document.getElementsByTagName("h2").length === 0) {
         var sp = hone.textContent.split(quotMark);
         hone.innerHTML = sp[0] + sp[1] + "<span>" + sp[2] + "</span>" + sp[3] + sp[4];
         span = hone.getElementsByTagName("span")[0];
@@ -275,28 +293,50 @@ function challengeName(){
     }
 }
 
-/* Multiple-choice question where we have to choose a word in the source language. Those are useless exercices, but we can’t get rid of them. */
+/* Multiple-choice question where we have to choose a word in the source language. Those are useless exercices, but we can’t get rid of them. */ /* TODO */
 function challengeForm(){
-    if(grade.children.length !== 0){
-        say(grade.getElementsByTagName("h2")[0].children[1].textContent);
+    if(document.getElementsByTagName("h2").length > 0) {
+        say(document.getElementsByTagName("h2")[0].children[1].textContent);
     }
 }
 
 /* Function dealing with the button on the home page */
+
+// Due to the removal of duo.user, finding what language is being learned is not immediate. This function gives a good guess
+function getLearningLanguage() {
+	for (var i = 0; i < localStorage.length; i++) {
+		var keySplit = localStorage.key(i).split(".");
+		if(keySplit.length === 3 && keySplit[1] == "languageTokens" && keySplit[2] != duo.uiLanguage) {
+			return keySplit[2];
+		}
+	}
+	var skillLink = document.querySelector("[data-test='red skill-tree-link']");
+	if(skillLink === null) {
+		skillLink = document.querySelector("[data-test='green skill-tree-link']");
+	}
+	if(skillLink === null) {
+		skillLink = document.querySelector("[data-test='blue skill-tree-link']");
+	}
+	if(skillLink === null) {
+		return null;
+	}
+	var linkParts = skillLink.href.split("/");
+	return linkParts[linkParts.length - 2];
+}
 
 function isReverseTree() {
     var reverseTrees = JSON.parse(localStorage.getItem("reverse_trees"));
     if(reverseTrees === null) {
         return false;
     }
-    var item = duo.user.attributes.ui_language + "-" + duo.user.attributes.learning_language;
+    var item = duo.uiLanguage + "-" + getLearningLanguage();
     return !!(reverseTrees[item]);
 }
 
 function toggleLang() {
     var reverseTrees = JSON.parse(localStorage.getItem("reverse_trees"));
     if(reverseTrees === null) { reverseTrees = {}; }
-    var item = duo.user.attributes.ui_language + "-" + duo.user.attributes.learning_language;
+    var item = duo.uiLanguage + "-" + getLearningLanguage();
     reverseTrees[item] = !reverseTrees[item];
     localStorage.setItem("reverse_trees", JSON.stringify(reverseTrees));
     updateButton();
@@ -314,18 +354,46 @@ function updateButton() {
     } 
 }
 
+/* pulling class equivalents from new website */
+
+function getClass() {
+	if(window.location.pathname == "/") {
+		return "home";
+	}
+	if(document.querySelector("[data-test='player-end-carousel']") !== null) {
+		return "slide-session-end";
+	}
+	if(document.querySelector("[data-test='challenge challenge-translate']") !== null) {
+		return "translate";
+	}
+	if(document.querySelector("[data-test='challenge challenge-judge']") !== null) {
+		return "judge";
+	}
+	if(document.querySelector("[data-test='challenge challenge-select']") !== null) {
+		return "select";
+	}
+	if(document.querySelector("[data-test='challenge challenge-name']") !== null) {
+		return "name";
+	}
+	if(document.querySelector("[data-test='challenge challenge-form']") !== null) {
+		return "form";
+	}
+	return null;
+}
+
+
 
 /* Function dispatching the changes in the page to the other functions */
 
 var oldclass = "";
 var targetLang;
-var grade, challenge;
+var challenge;
 
 function onChange() {
-    var newclass = document.getElementById("app").className;
+	var newclass = getClass();
     
     if(/home/.test(newclass) && !document.getElementById("reverse-tree-enhancer-button")){
-        var tree = document.getElementsByClassName("tree")[0];
+		var tree = document.querySelector("[data-test='skill-tree']");
         var button = document.createElement("button");
         button.id = "reverse-tree-enhancer-button";
         button.onclick = toggleLang;
@@ -352,15 +420,11 @@ function onChange() {
             removeCSSHiding();
             return;
         }
-        targetLang = duo.user.attributes.ui_language;
+        targetLang = duo.uiLanguage;
         if(!document.getElementById("timer")) { addCSSHiding(); } else { removeCSSHiding(); }
         
-        var sec = document.getElementById("session-element-container");
-        if(!sec){return;}
-        challenge = sec.children[0];
-        grade = document.getElementById("grade");
-        
         if(/translate/.test(newclass)){
+            challenge = document.querySelector("[data-test='challenge challenge-translate']");
             if (challenge.getElementsByTagName("textarea")[0].getAttribute("lang") == targetLang){
                 challengeTranslateSource();
             } else {
@@ -368,15 +432,19 @@ function onChange() {
             }
         }
         if(/judge/.test(newclass)){
+        	challenge = document.querySelector("[data-test='challenge challenge-judge']");
             challengeJudge();
         }
         if(/select/.test(newclass)){
+        	challenge = document.querySelector("[data-test='challenge challenge-select']");
             challengeSelect();
         }
         if(/name/.test(newclass)){
+        	challenge = document.querySelector("[data-test='challenge challenge-name']");
             challengeName();
         }
         if(/form/.test(newclass)){
+        	challenge = document.querySelector("[data-test='challenge challenge-form']");
             challengeForm();
         }
     }
